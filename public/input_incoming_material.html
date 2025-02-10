@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Input Incoming Material</title>
+
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="container mt-4">
+
+    <h2 class="mb-4 text-primary">Input Incoming Material</h2>
+
+    <!-- Form -->
+    <form id="incomingForm">
+        <div class="table-responsive">
+            <table class="table table-striped table-hover table-bordered">
+                <thead class="table-dark">
+                    <tr>
+                        <th>ID Material</th>
+                        <th>Nama Material</th>
+                        <th>Quantity</th>
+                        <th>Tanggal</th>
+                        <th>Unit</th>
+                        <th>Aksi</th>
+                    </tr>
+                </thead>
+                <tbody id="materialTableBody">
+                    <tr>
+                        <td><input type="text" name="id_material" class="form-control id_material" required></td>
+                        <td><input type="text" name="material_name" class="form-control material_name" required></td>
+                        <td><input type="number" name="stock" class="form-control" step="0.01" required></td>
+                        <td><input type="date" name="tanggal" class="form-control" required></td>
+                        <td>
+                            <select name="unit" class="form-select quantity" required>
+                                <option value="kg">Kilogram</option>
+                                <option value="gr">Gram</option>
+                                <option value="mtr">Meter</option>
+                                <option value="pcs">Pcs</option>
+                                <option value="set">Set</option>
+                            </select>
+                        </td>
+                        <td><button type="button" class="btn btn-danger" onclick="removeRow(this)">Hapus</button></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <button type="button" class="btn btn-success" onclick="addRow()">Tambah Material</button>
+        <button type="submit" class="btn btn-primary">Simpan Semua</button>
+    </form>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+    <script>
+        function addRow() {
+            const tableBody = document.getElementById('materialTableBody');
+            const newRow = tableBody.rows[0].cloneNode(true);
+            newRow.querySelectorAll('input').forEach(input => input.value = '');
+            newRow.querySelectorAll('select').forEach(select => select.value = 'pcs');
+            tableBody.appendChild(newRow);
+        }
+
+        function removeRow(button) {
+            const row = button.closest('tr');
+            const tableBody = row.parentNode;
+            if (tableBody.rows.length > 1) {
+                tableBody.removeChild(row);
+            } else {
+                alert('Minimal harus ada satu baris.');
+            }
+        }
+
+        document.getElementById('materialTableBody').addEventListener('input', async function(event) {
+            if (event.target.classList.contains('id_material')) {
+                const id_material = event.target.value;
+                const row = event.target.closest('tr');
+                const materialNameInput = row.querySelector('.material_name');
+                const unitSelect = row.querySelector('.quantity');
+
+                if (id_material) {
+                    try {
+                        const response = await fetch(`http://localhost:8800/material/${id_material}`);
+                        if (response.ok) {
+                            const material = await response.json();
+                            materialNameInput.value = material.material_name || '';
+                            unitSelect.value = material.quantity || '';
+                            materialNameInput.readOnly = true;
+                            unitSelect.disabled = true;
+                        } else {
+                            materialNameInput.value = '';
+                            unitSelect.value = 'pcs';
+                            materialNameInput.readOnly = false;
+                            unitSelect.disabled = false;
+                        }
+                    } catch (error) {
+                        console.error('Gagal mengambil data material:', error);
+                        materialNameInput.value = '';
+                        unitSelect.value = 'pcs';
+                        materialNameInput.readOnly = false;
+                        unitSelect.disabled = false;
+                    }
+                } else {
+                    materialNameInput.value = '';
+                    unitSelect.value = 'pcs';
+                    materialNameInput.readOnly = false;
+                    unitSelect.disabled = false;
+                }
+            }
+        });
+
+        document.getElementById('incomingForm').addEventListener('submit', async function(event) {
+            event.preventDefault();
+
+            const rows = Array.from(document.querySelectorAll('#materialTableBody tr'));
+            const data = rows.map(row => {
+                return {
+                    id_material: row.querySelector('input[name="id_material"]').value,
+                    material_name: row.querySelector('input[name="material_name"]').value,
+                    stock: parseFloat(row.querySelector('input[name="stock"]').value),
+                    quantity: row.querySelector('select[name="unit"]').value,
+                    tanggal: row.querySelector('input[name="tanggal"]').value
+                };
+            });
+
+            try {
+                const response = await fetch('http://localhost:8800/incoming_material', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+
+                if (response.ok) {
+                    alert('Material berhasil ditambahkan!');
+                    document.getElementById('incomingForm').reset();
+                } else {
+                    alert('Gagal menambahkan material');
+                }
+            } catch (error) {
+                console.error('Gagal mengirim data:', error);
+                alert('Terjadi kesalahan saat mengirim data');
+            }
+        });
+    </script>
+
+</body>
+</html>
