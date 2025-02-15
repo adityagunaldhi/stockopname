@@ -1,6 +1,7 @@
 const express = require('express');
 const mysql = require('mysql2');
 const cors = require('cors');
+const ExcelJS = require('exceljs');
 
 const app = express();
 app.use(express.json());
@@ -83,12 +84,29 @@ app.post('/application_material_requirements', (req, res) => {
     });
 });
 
+//Endpoint untuk menampilkan penggunaan material
+app.get('/application_material_usage', async (req, res) => {
+    try {
+        const query = `
+            SELECT amu.no_spk, a.application_name, amu.id_material, amu.used_quantity, amu.date_used
+            FROM application_material_usage amu
+            JOIN application a ON amu.id_application = a.id_application
+        `;
+
+        const [rows] = await db.promise().query(query);
+        res.json(rows);
+    } catch (error) {
+        console.error("Error fetching usage data:", error);
+        res.status(500).json({ error: "Internal Server Error" });
+    }
+});
+
 // Endpoint untuk menambahkan penggunaan material
 app.post('/application_material_usage', (req, res) => {
-    const { id_application, id_material, used_quantity } = req.body;
+    const { id_application, no_spk, id_material, used_quantity } = req.body;
 
     // Validasi input
-    if (!id_application || !id_material || !used_quantity) {
+    if (!id_application ||!no_spk ||!id_material || !used_quantity) {
         return res.status(400).json({ error: 'Data input tidak valid' });
     }
 
@@ -112,8 +130,8 @@ app.post('/application_material_usage', (req, res) => {
             }
 
             // Insert data ke tabel application_material_usage
-            const insertSql = 'INSERT INTO application_material_usage (id_application, id_material, used_quantity) VALUES (?, ?, ?)';
-            db.query(insertSql, [id_application, id_material, used_quantity], (err, result) => {
+            const insertSql = 'INSERT INTO application_material_usage (id_application, no_spk, id_material, used_quantity) VALUES (?, ?, ?, ?)';
+            db.query(insertSql, [id_application, no_spk, id_material, used_quantity], (err, result) => {
                 if (err) {
                     return res.status(500).json({ error: err.message });
                 }
@@ -122,6 +140,58 @@ app.post('/application_material_usage', (req, res) => {
         });
     });
 });
+
+// Endpoint untuk mengunduh laporan Excel
+app.get('/download-report', async (req, res) => {
+    try {
+        // Ambil bulan dan tahun dari query parameter
+        const { month, year } = req.query;
+
+        if (!month || !year) {
+            return res.status(400).json({ message: "Mohon masukkan bulan dan tahun." });
+        }
+
+        // Ambil data dari database berdasarkan bulan & tahun
+        const [rows] = await db.promise().query(`
+            SELECT amu.no_spk, a.application_name, amu.date_used 
+            FROM application_material_usage amu
+            JOIN application a ON amu.id_application = a.id_application
+            WHERE MONTH(amu.date_used) = ? AND YEAR(amu.date_used) = ?
+        `, [month, year]);
+
+        if (rows.length === 0) {
+            return res.status(404).json({ message: "Tidak ada data untuk bulan dan tahun tersebut." });
+        }
+
+        // Buat workbook Excel baru
+        const workbook = new ExcelJS.Workbook();
+        const worksheet = workbook.addWorksheet(`Laporan ${month}-${year}`);
+
+        // Header kolom
+        worksheet.columns = [
+            { header: 'No. SPK', key: 'no_spk', width: 20 },
+            { header: 'Nama Aplikasi', key: 'application_name', width: 25 },
+            { header: 'Tanggal Penggunaan', key: 'date_used', width: 20 }
+        ];
+
+        // Tambahkan data ke dalam worksheet
+        rows.forEach(row => worksheet.addRow(row));
+
+        // Konversi workbook ke Buffer
+        const buffer = await workbook.xlsx.writeBuffer();
+
+        // Set response headers
+        res.setHeader('Content-Disposition', `attachment; filename="Laporan_${month}_${year}.xlsx"`);
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+
+        // Kirim file Excel sebagai response
+        res.send(buffer);
+    } catch (error) {
+        console.error("Gagal membuat laporan:", error);
+        res.status(500).json({ message: "Terjadi kesalahan saat membuat laporan." });
+    }
+});
+
 
 // Endpoint untuk menambahkan incoming material
 app.post('/incoming_material', (req, res) => {

@@ -1,0 +1,5 @@
+# Mengabaikan folder node_modules
+node_modules/
+
+# Mengabaikan file environment (jika ada informasi sensitif)
+.env

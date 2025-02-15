@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="id">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -23,6 +23,11 @@
             </div>
 
             <div class="mb-3">
+                <label for="no_spk" class="form-label">No. SPK</label>
+                <input type="text" id="no_spk" class="form-control" placeholder="No. SPK" required>
+            </div>
+
+            <div class="mb-3">
                 <label for="id_material" class="form-label">Material ID</label>
                 <input type="text" id="id_material" class="form-control" placeholder="Material ID" required>
             </div>
@@ -34,6 +39,54 @@
 
             <button type="submit" class="btn btn-primary w-100">Add Usage</button>
         </form>
+    </div>
+
+    <!-- Form Download Laporan Per Bulan -->
+    <div class="mt-4 card p-4 shadow-sm">
+        <h3 class="text-success">Download Laporan Per Bulan</h3>
+        <form id="downloadForm">
+            <div class="mb-3">
+                <label for="month" class="form-label">Pilih Bulan</label>
+                <select id="month" class="form-select" required>
+                    <option value="1">Januari</option>
+                    <option value="2">Februari</option>
+                    <option value="3">Maret</option>
+                    <option value="4">April</option>
+                    <option value="5">Mei</option>
+                    <option value="6">Juni</option>
+                    <option value="7">Juli</option>
+                    <option value="8">Agustus</option>
+                    <option value="9">September</option>
+                    <option value="10">Oktober</option>
+                    <option value="11">November</option>
+                    <option value="12">Desember</option>
+                </select>
+            </div>
+
+            <div class="mb-3">
+                <label for="year" class="form-label">Pilih Tahun</label>
+                <input type="number" id="year" class="form-control" value="2025" required>
+            </div>
+
+            <button type="submit" class="btn btn-success w-100">Download Laporan</button>
+        </form>
+    </div>
+
+    <!-- Tabel Data Usage -->
+    <h3 class="mt-5">Daftar Penggunaan Material</h3>
+    <div class="table-responsive">
+        <table class="table table-bordered mt-3">
+            <thead class="table-dark">
+                <tr>
+                    <th>No. SPK</th>
+                    <th>Nama Aplikasi</th>
+                    <th>Material ID</th>
+                    <th>Used Quantity</th>
+                    <th>Tanggal Penggunaan</th>
+                </tr>
+            </thead>
+            <tbody id="usageTableBody"></tbody>
+        </table>
     </div>
 
     <!-- Bootstrap JS -->
@@ -59,11 +112,35 @@
             }
         }
 
+        async function fetchUsageData() {
+            try {
+                const response = await fetch('http://localhost:8800/application_material_usage');
+                const usages = await response.json();
+
+                const tableBody = document.getElementById('usageTableBody');
+                tableBody.innerHTML = ''; 
+
+                usages.forEach(usage => {
+                    tableBody.innerHTML += `
+                        <tr>
+                            <td>${usage.no_spk}</td>
+                            <td>${usage.application_name}</td>
+                            <td>${usage.id_material}</td>
+                            <td>${usage.used_quantity}</td>
+                            <td>${usage.date_used}</td>
+                        </tr>`;
+                });
+            } catch (error) {
+                console.error("Error fetching usage data:", error);
+            }
+        }
+
         document.getElementById('usageForm').addEventListener('submit', async function(event) {
             event.preventDefault();
             
             const data = {
                 id_application: document.getElementById('id_application').value,
+                no_spk: document.getElementById('no_spk').value,
                 id_material: document.getElementById('id_material').value,
                 used_quantity: parseFloat(document.getElementById('used_quantity').value)
             };
@@ -77,12 +154,25 @@
             if (response.ok) {
                 alert('Usage added successfully!');
                 document.getElementById('usageForm').reset();
+                fetchUsageData(); // Refresh tabel setelah submit
             } else {
                 alert('Failed to add usage');
             }
         });
 
+        // Event Listener untuk Download Laporan
+        document.getElementById('downloadForm').addEventListener('submit', function(event) {
+            event.preventDefault();
+
+            const month = document.getElementById('month').value;
+            const year = document.getElementById('year').value;
+
+            // Redirect ke URL download dengan parameter bulan & tahun
+            window.location.href = `http://localhost:8800/download-report?month=${month}&year=${year}`;
+        });
+
         fetchApplications();
+        fetchUsageData();
     </script>
 
 </body>
